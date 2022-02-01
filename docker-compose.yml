@@ -1,0 +1,53 @@
+version: '3.8'
+
+
+services:
+  rabbitmq:
+    hostname: rabbitmq
+    image: rabbitmq:3-management-alpine
+    container_name: 'rabbitmq'
+    environment:
+      - RABBITMQ_DEFAULT_USER=myuser
+      - RABBITMQ_DEFAULT_PASS=mypassword
+    ports:
+      # AMQP protocol port
+      - 5672:5672   # for internal use
+      # HTTP management UI
+      - 15672:15672 # for external use (rabbitmq dashboard)
+
+  scrape_request_service:
+    image: scrape_request_service:latest
+    container_name: scrape_request_service
+    ports:
+      - 8080:8080
+    environment:
+      - CELERY_BROKER_URI=pyamqp://myuser:mypassword@rabbitmq//
+      - CELERY_BACKEND_URI=rpc://
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  scraper_service:
+    image: scraper_service:latest
+    container_name: scraper_service
+    ports:
+      - 8081:8081
+    environment:
+      - CELERY_BROKER_URI=pyamqp://myuser:mypassword@rabbitmq//
+      - CELERY_BACKEND_URI=rpc://
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  flower:
+    image: mher/flower
+    environment:
+      - CELERY_BROKER_URL=amqp://myuser:mypassword@rabbitmq
+      - FLOWER_PORT=8888
+    ports:
+      - 8888:8888
+    depends_on:
+      - rabbitmq
+
